@@ -9,7 +9,7 @@ import type { SimConfig, SimResult, SimSample } from '@core/pid/types'
 import type { ScopeSeries } from '../scope/fpv-scope.js'
 import '../primitives/index.js'
 import '../scope/fpv-scope.js'
-import '../quad-preview/fpv-quad-preview.js'
+import '../quad-preview/fpv-quad-preview-3d.js'
 import './pid-controls.js'
 
 // ── Default config ────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ export class PidSimulator extends LitElement {
         min-height: 300px;
       }
 
-      fpv-quad-preview {
+      fpv-quad-preview-3d {
         height: 220px;
       }
 
@@ -478,13 +478,14 @@ export class PidSimulator extends LitElement {
             </div>
           </fpv-card>
 
-          <fpv-quad-preview
+          <fpv-quad-preview-3d
             .motorOutputs=${quad.motorOutputs}
             .setpointDegS=${quad.setpointDegS}
             .gyroDegS=${quad.gyroDegS}
             .errorDegS=${quad.errorDegS}
             .saturated=${quad.saturated}
-          ></fpv-quad-preview>
+            .axis=${'roll'}
+          ></fpv-quad-preview-3d>
         </div>
       </div>
     `
