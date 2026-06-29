@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { ROUTE_META } from './seo'
+import { fpvI18n } from '@core/shared/i18n'
+import { ROUTE_SEO_KEYS } from './seo'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -52,12 +53,12 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
-  const meta = ROUTE_META[to.path] || ROUTE_META['/']
-  document.title = meta.title
+function applyMeta(path: string): void {
+  const key = ROUTE_SEO_KEYS[path] ?? 'home'
+  document.title = fpvI18n.t(`seo.${key}_title`)
 
   let descEl = document.querySelector('meta[name="description"]')
-  if (descEl) descEl.setAttribute('content', meta.description)
+  if (descEl) descEl.setAttribute('content', fpvI18n.t(`seo.${key}_desc`))
 
   let ogTitleEl = document.querySelector('meta[property="og:title"]')
   if (!ogTitleEl) {
@@ -65,7 +66,7 @@ router.beforeEach((to) => {
     ogTitleEl.setAttribute('property', 'og:title')
     document.head.appendChild(ogTitleEl)
   }
-  ogTitleEl.setAttribute('content', meta.ogTitle || meta.title)
+  ogTitleEl.setAttribute('content', fpvI18n.t(`seo.${key}_title`))
 
   let ogDescEl = document.querySelector('meta[property="og:description"]')
   if (!ogDescEl) {
@@ -73,7 +74,17 @@ router.beforeEach((to) => {
     ogDescEl.setAttribute('property', 'og:description')
     document.head.appendChild(ogDescEl)
   }
-  ogDescEl.setAttribute('content', meta.description)
+  ogDescEl.setAttribute('content', fpvI18n.t(`seo.${key}_desc`))
+}
+
+// Re-apply meta whenever locale changes
+fpvI18n.subscribe(() => {
+  const currentPath = router.currentRoute.value.path
+  applyMeta(currentPath)
+})
+
+router.beforeEach((to) => {
+  applyMeta(to.path)
 })
 
 export default router
