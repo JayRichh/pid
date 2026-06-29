@@ -39,7 +39,8 @@ export class FpvSelect extends LitElement {
         color: var(--fpv-text);
         font-family: var(--fpv-font-mono);
         font-size: var(--fpv-font-body);
-        padding: 4px var(--fpv-space-sm);
+        padding: 8px var(--fpv-space-sm);
+        min-height: 44px;
         outline: none;
         cursor: pointer;
         transition: border-color 0.15s;

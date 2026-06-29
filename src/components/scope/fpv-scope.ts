@@ -51,8 +51,8 @@ export class FpvScope extends LitElement {
       canvas {
         display: block;
         width: 100%;
-        min-height: 300px;
-        height: 300px;
+        min-height: 200px;
+        height: clamp(200px, 35vh, 350px);
         cursor: crosshair;
       }
 
@@ -129,6 +129,15 @@ export class FpvScope extends LitElement {
   private _dragStartZoomStart = 0
   private _dragStartZoomEnd = 0
 
+  // ─── Touch state ─────────────────────────────────────────────────────────
+
+  private _touchStartId = -1
+  private _touchStartX = 0
+  private _pinchStartDist = 0
+  private _pinchStartZoomStart = 0
+  private _pinchStartZoomEnd = 0
+  private _lastTapTime = 0
+
   // ─── Bound event listeners (stored for clean removal) ────────────────────
 
   private _boundWheel!: (e: WheelEvent) => void
@@ -138,6 +147,10 @@ export class FpvScope extends LitElement {
   private _boundDblClick!: () => void
   private _boundWindowMove!: (e: MouseEvent) => void
   private _boundWindowUp!: () => void
+  private _boundTouchStart!: (e: TouchEvent) => void
+  private _boundTouchMove!: (e: TouchEvent) => void
+  private _boundTouchEnd!: (e: TouchEvent) => void
+  private _boundTouchCancel!: () => void
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -205,7 +218,7 @@ export class FpvScope extends LitElement {
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
     const w = Math.max(rect.width || canvas.clientWidth || 600, 1)
-    const h = Math.max(rect.height || canvas.clientHeight || 300, 300)
+    const h = Math.max(rect.height || canvas.clientHeight || 200, 200)
     this._dpr = window.devicePixelRatio || 1
     canvas.width = Math.round(w * this._dpr)
     canvas.height = Math.round(h * this._dpr)
@@ -683,22 +696,112 @@ export class FpvScope extends LitElement {
       window.removeEventListener('mouseup',   this._boundWindowUp)
     }
 
+    // Touch handlers (stored as bound fields so they can be removed)
+    this._boundTouchStart = (e: TouchEvent) => {
+      e.preventDefault()
+
+      if (e.touches.length === 1) {
+        const rect = canvas.getBoundingClientRect()
+        const touch = e.touches[0]
+        this._touchStartId = touch.identifier
+        this._touchStartX = touch.clientX
+        this._dragStartZoomStart = this._zoomStart
+        this._dragStartZoomEnd = this._zoomEnd
+        this._hoverX = touch.clientX - rect.left
+        this._dirty = true
+
+        // Double-tap detection
+        const now = Date.now()
+        if (now - this._lastTapTime < 300) {
+          this._zoomStart = 0
+          this._zoomEnd = 1
+          this._dirty = true
+        }
+        this._lastTapTime = now
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[1].clientX - e.touches[0].clientX
+        const dy = e.touches[1].clientY - e.touches[0].clientY
+        this._pinchStartDist = Math.hypot(dx, dy)
+        this._pinchStartZoomStart = this._zoomStart
+        this._pinchStartZoomEnd = this._zoomEnd
+      }
+    }
+
+    this._boundTouchMove = (e: TouchEvent) => {
+      e.preventDefault()
+      const rect = canvas.getBoundingClientRect()
+
+      if (e.touches.length === 1) {
+        const touch = e.touches[0]
+        const dx = touch.clientX - this._touchStartX
+        const range = this._dragStartZoomEnd - this._dragStartZoomStart
+        const dtNorm = -(dx / rect.width) * range
+        let ns = this._dragStartZoomStart + dtNorm
+        let ne = this._dragStartZoomEnd + dtNorm
+        if (ns < 0) { ns = 0; ne = range }
+        if (ne > 1) { ne = 1; ns = 1 - range }
+        this._zoomStart = Math.max(0, ns)
+        this._zoomEnd = Math.min(1, ne)
+        this._hoverX = touch.clientX - rect.left
+        this._dirty = true
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[1].clientX - e.touches[0].clientX
+        const dy = e.touches[1].clientY - e.touches[0].clientY
+        const dist = Math.hypot(dx, dy)
+        const scale = this._pinchStartDist / dist
+        const range = this._pinchStartZoomEnd - this._pinchStartZoomStart
+        const newRange = Math.max(MIN_ZOOM_RANGE, Math.min(1, range * scale))
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left
+        const norm = midX / rect.width
+        const cursorT = this._pinchStartZoomStart + norm * range
+        let ns = cursorT - norm * newRange
+        let ne = ns + newRange
+        if (ns < 0) { ns = 0; ne = newRange }
+        if (ne > 1) { ne = 1; ns = 1 - newRange }
+        this._zoomStart = Math.max(0, ns)
+        this._zoomEnd = Math.min(1, ne)
+        this._dirty = true
+      }
+    }
+
+    this._boundTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) {
+        this._hoverX = -1
+        this._dirty = true
+      }
+    }
+
+    this._boundTouchCancel = () => {
+      this._hoverX = -1
+      this._dirty = true
+    }
+
     // wheel must be non-passive to call preventDefault
-    canvas.addEventListener('wheel',      this._boundWheel,      { passive: false })
-    canvas.addEventListener('mousedown',  this._boundMouseDown)
-    canvas.addEventListener('mousemove',  this._boundMouseMove)
-    canvas.addEventListener('mouseleave', this._boundMouseLeave)
-    canvas.addEventListener('dblclick',   this._boundDblClick)
+    canvas.addEventListener('wheel',        this._boundWheel,       { passive: false })
+    canvas.addEventListener('mousedown',    this._boundMouseDown)
+    canvas.addEventListener('mousemove',    this._boundMouseMove)
+    canvas.addEventListener('mouseleave',   this._boundMouseLeave)
+    canvas.addEventListener('dblclick',     this._boundDblClick)
+    canvas.addEventListener('touchstart',   this._boundTouchStart,  { passive: false })
+    canvas.addEventListener('touchmove',    this._boundTouchMove,   { passive: false })
+    canvas.addEventListener('touchend',     this._boundTouchEnd)
+    canvas.addEventListener('touchcancel',  this._boundTouchCancel)
   }
 
   private _removeCanvasListeners() {
     const canvas = this._canvas
     if (!canvas || !this._boundWheel) return
-    canvas.removeEventListener('wheel',      this._boundWheel)
-    canvas.removeEventListener('mousedown',  this._boundMouseDown)
-    canvas.removeEventListener('mousemove',  this._boundMouseMove)
-    canvas.removeEventListener('mouseleave', this._boundMouseLeave)
-    canvas.removeEventListener('dblclick',   this._boundDblClick)
+    canvas.removeEventListener('wheel',       this._boundWheel)
+    canvas.removeEventListener('mousedown',   this._boundMouseDown)
+    canvas.removeEventListener('mousemove',   this._boundMouseMove)
+    canvas.removeEventListener('mouseleave',  this._boundMouseLeave)
+    canvas.removeEventListener('dblclick',    this._boundDblClick)
+    if (this._boundTouchStart) {
+      canvas.removeEventListener('touchstart',  this._boundTouchStart)
+      canvas.removeEventListener('touchmove',   this._boundTouchMove)
+      canvas.removeEventListener('touchend',    this._boundTouchEnd)
+      canvas.removeEventListener('touchcancel', this._boundTouchCancel)
+    }
   }
 
   // ─── Legend toggle ────────────────────────────────────────────────────────

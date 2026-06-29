@@ -33,7 +33,9 @@ export class FpvNumber extends LitElement {
         background: var(--fpv-surface-2);
         border: 1px solid var(--fpv-border);
         border-radius: var(--fpv-radius-sm);
-        padding: 2px var(--fpv-space-sm);
+        padding: 6px var(--fpv-space-sm);
+        min-height: 44px;
+        box-sizing: border-box;
         transition: border-color 0.15s;
       }
 

@@ -15,6 +15,7 @@ export class FpvSlider extends LitElement {
         display: flex;
         align-items: center;
         gap: var(--fpv-space-sm);
+        min-height: 44px;
       }
 
       .label {
@@ -38,8 +39,8 @@ export class FpvSlider extends LitElement {
 
       input[type='range']::-webkit-slider-thumb {
         appearance: none;
-        width: 14px;
-        height: 14px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         background: var(--fpv-primary);
         cursor: pointer;
@@ -51,8 +52,8 @@ export class FpvSlider extends LitElement {
       }
 
       input[type='range']::-moz-range-thumb {
-        width: 14px;
-        height: 14px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         background: var(--fpv-primary);
         border: none;

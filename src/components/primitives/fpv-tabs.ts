@@ -18,7 +18,7 @@ export class FpvTabs extends LitElement {
       }
 
       .tab {
-        padding: var(--fpv-space-xs) var(--fpv-space-md);
+        padding: var(--fpv-space-sm) var(--fpv-space-md);
         font-size: var(--fpv-font-label);
         text-transform: uppercase;
         letter-spacing: 0.06em;
@@ -27,6 +27,9 @@ export class FpvTabs extends LitElement {
         border-radius: var(--fpv-radius-sm) var(--fpv-radius-sm) 0 0;
         transition: color 0.15s, background 0.15s;
         user-select: none;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
       }
 
       .tab:hover {

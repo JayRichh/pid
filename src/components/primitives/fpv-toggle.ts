@@ -17,6 +17,7 @@ export class FpvToggle extends LitElement {
         gap: var(--fpv-space-sm);
         cursor: pointer;
         user-select: none;
+        min-height: 44px;
       }
 
       .label {
