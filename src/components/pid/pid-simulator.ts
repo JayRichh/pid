@@ -287,8 +287,8 @@ export class PidSimulator extends LitElement {
   private _onConfigChange(e: CustomEvent<Partial<SimConfig>>) {
     e.stopPropagation()
     this._config = e.detail as SimConfig
-    this._resetSim()
     if (this._running) {
+      this._resetSim()
       this._startLoop()
     }
   }
