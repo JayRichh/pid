@@ -1,6 +1,7 @@
 import { LitElement, html, css, PropertyValues } from 'lit'
 import { customElement, property, state } from 'lit/decorators.js'
 import { tokenStyles } from '../primitives/tokens.css.js'
+import { ThemeColors } from '../primitives/theme-colors.js'
 import { catmullRom, lttbDecimate } from '@core/shared/interpolate'
 
 // ─── Public interfaces ────────────────────────────────────────────────────────
@@ -306,6 +307,8 @@ export class FpvScope extends LitElement {
 
   // ─── Draw orchestration ───────────────────────────────────────────────────
 
+  private _theme = new ThemeColors(this)
+
   private _draw() {
     const ctx = this._ctx
     const canvas = this._canvas
@@ -318,14 +321,14 @@ export class FpvScope extends LitElement {
     ctx.save()
     ctx.scale(dpr, dpr)
 
-    // Resolve CSS variables once per frame
-    const cs = getComputedStyle(this)
-    const surface   = cs.getPropertyValue('--fpv-surface').trim()   || '#14141f'
-    const border    = cs.getPropertyValue('--fpv-border').trim()    || '#2a2a3a'
-    const textMuted = cs.getPropertyValue('--fpv-text-muted').trim()|| '#8888a0'
-    const surface2  = cs.getPropertyValue('--fpv-surface-2').trim() || '#1e1e2e'
-    const fontLabel = cs.getPropertyValue('--fpv-font-label').trim()|| '12px'
-    const fontMono  = cs.getPropertyValue('--fpv-font-mono').trim() || 'JetBrains Mono, monospace'
+    // Resolve CSS variables (cached; re-read periodically instead of every frame)
+    this._theme.frame()
+    const surface   = this._theme.get('--fpv-surface', '#14141f')
+    const border    = this._theme.get('--fpv-border', '#2a2a3a')
+    const textMuted = this._theme.get('--fpv-text-muted', '#8888a0')
+    const surface2  = this._theme.get('--fpv-surface-2', '#1e1e2e')
+    const fontLabel = this._theme.get('--fpv-font-label', '12px')
+    const fontMono  = this._theme.get('--fpv-font-mono', 'JetBrains Mono, monospace')
 
     ctx.fillStyle = surface
     ctx.fillRect(0, 0, W, H)

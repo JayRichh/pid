@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit'
 import { customElement, property } from 'lit/decorators.js'
 import { tokenStyles } from '../primitives/tokens.css.js'
+import { ThemeColors } from '../primitives/theme-colors.js'
 
 type V3 = [number, number, number]
 
@@ -154,6 +155,8 @@ export class FpvQuadPreview3d extends LitElement {
     this._dirty = true
   }
 
+  private _theme = new ThemeColors(this)
+
   private _draw() {
     const ctx = this._ctx
     const canvas = this._canvas
@@ -167,8 +170,8 @@ export class FpvQuadPreview3d extends LitElement {
     ctx.scale(dpr, dpr)
     ctx.clearRect(0, 0, W, H)
 
-    const cs = getComputedStyle(this)
-    const get = (v: string, fb: string) => cs.getPropertyValue(v).trim() || fb
+    this._theme.frame()
+    const get = (v: string, fb: string) => this._theme.get(v, fb)
     const clrPrimary = get('--fpv-primary', '#00d4aa')
     const clrMuted = get('--fpv-text-muted', '#8888a0')
     const clrInfo = get('--fpv-info', '#4488ff')

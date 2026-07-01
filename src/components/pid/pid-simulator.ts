@@ -39,6 +39,14 @@ const COLOR_I        = '#aa44ff'
 const COLOR_D        = '#44ccaa'
 const COLOR_MOTOR    = '#888888'
 
+/**
+ * Cap on retained full-run samples (~20s at 1 kHz decimation) so a
+ * continuously-running sim never grows memory without bound. The step response
+ * used for metrics is at the start of the run, so keeping the earliest samples
+ * preserves metric accuracy.
+ */
+const MAX_FULL_SAMPLES = 20000
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 @customElement('pid-simulator')
@@ -243,8 +251,11 @@ export class PidSimulator extends LitElement {
 
       const newSamples = this._runner!.tick(clampedDelta)
 
-      // Accumulate for metrics (computed on Stop)
-      this._fullSamples.push(...newSamples)
+      // Accumulate for metrics (computed on Stop), bounded so a long-running
+      // sim doesn't grow memory without limit (see MAX_FULL_SAMPLES).
+      if (this._fullSamples.length < MAX_FULL_SAMPLES) {
+        this._fullSamples.push(...newSamples)
+      }
 
       // Rolling window for display
       this._rollingBuf.push(...newSamples)
