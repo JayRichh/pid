@@ -47,6 +47,13 @@ const COLOR_MOTOR    = '#888888'
  */
 const MAX_FULL_SAMPLES = 20000
 
+/**
+ * Recompute live metrics ~3×/second (every N frames at 60fps) while the Metrics
+ * tab is visible, so rise/overshoot/settling update as gains are tuned instead
+ * of only appearing on Stop.
+ */
+const METRICS_EVERY = 20
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 @customElement('pid-simulator')
@@ -191,6 +198,7 @@ export class PidSimulator extends LitElement {
   private _rollingBuf: SimSample[] = []
   private _fullSamples: SimSample[] = []
   private _windowMs = 2000
+  private _metricsTick = 0
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -224,8 +232,11 @@ export class PidSimulator extends LitElement {
   private _stopLoop() {
     this._running = false
     cancelAnimationFrame(this._rafId)
+    this._result = this._computeMetrics()
+  }
 
-    // Compute metrics from accumulated full-run samples
+  /** Compute step-response metrics from the accumulated full-run samples. */
+  private _computeMetrics(): SimResult {
     let spAmplitude = 0
     const sp = this._config.setpoint
     if (sp.kind === 'step' || sp.kind === 'ramp' || sp.kind === 'sine') {
@@ -233,8 +244,7 @@ export class PidSimulator extends LitElement {
     } else if (sp.kind === 'trace') {
       spAmplitude = sp.samplesDegS.reduce((m, v) => Math.max(m, Math.abs(v)), 0)
     }
-    const metrics = computeMetrics(this._fullSamples, spAmplitude)
-    this._result = { samples: this._fullSamples, metrics }
+    return { samples: this._fullSamples, metrics: computeMetrics(this._fullSamples, spAmplitude) }
   }
 
   private _tick() {
@@ -265,6 +275,12 @@ export class PidSimulator extends LitElement {
       const cutoff = this._elapsedMs - this._windowMs
       while (this._rollingBuf.length > 0 && this._rollingBuf[0].tMs < cutoff) {
         this._rollingBuf.shift()
+      }
+
+      // Live metrics while the Metrics tab is open (throttled — recompute is
+      // O(samples)); lets the user watch metrics change as they tune gains.
+      if (this._activeTab === 2 && this._metricsTick++ % METRICS_EVERY === 0) {
+        this._result = this._computeMetrics()
       }
 
       this.requestUpdate()
@@ -375,9 +391,6 @@ export class PidSimulator extends LitElement {
   // ── Metrics rendering ─────────────────────────────────────────────────────
 
   private _renderMetrics() {
-    if (this._running) {
-      return html`<div class="metric-null">${this._i18n.t('common.running')}</div>`
-    }
 
     const m = this._result?.metrics
     if (!m) return html`<div class="metric-null">${this._i18n.t('pid.loading')}</div>`
@@ -475,7 +488,10 @@ export class PidSimulator extends LitElement {
                 this._i18n.t('pid.tab_metrics'),
               ]}
               .active=${this._activeTab}
-              @tab-change=${(e: CustomEvent<number>) => { this._activeTab = e.detail }}
+              @tab-change=${(e: CustomEvent<number>) => {
+                this._activeTab = e.detail
+                if (e.detail === 2 && this._running) this._result = this._computeMetrics()
+              }}
             ></fpv-tabs>
             <div class="tab-panel">
               ${this._activeTab === 0 ? html`

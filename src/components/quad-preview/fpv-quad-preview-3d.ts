@@ -200,20 +200,23 @@ export class FpvQuadPreview3d extends LitElement {
     const gyroAngle = clamp(this.gyroDegS / 720 * 45, -60, 60) * DEG
     const spAngle = clamp(this.setpointDegS / 720 * 45, -60, 60) * DEG
 
-    // Transform pipeline: quad rotation -> camera rotation -> projection
-    const xform = (p: V3): [number, number, number] => {
-      let v = p
-      // Apply quad rotation based on axis
-      if (this.axis === 'roll') v = rotX(v, gyroAngle)
-      else if (this.axis === 'pitch') v = rotZ(v, -gyroAngle)
-      else v = rotY(v, gyroAngle)
-      // Camera rotation
+    // Transform pipeline. The camera + projection stage is shared. The quad
+    // model is additionally rotated by the gyro attitude; the ground reference
+    // plane stays world-fixed (camera only) so the quad visibly banks against a
+    // level horizon instead of the ground rolling with it.
+    const camProject = (v: V3): [number, number, number] => {
       v = rotX(v, camPitch)
       v = rotY(v, camYaw)
-      // Scale to screen units
       v = [v[0] * scale, v[1] * scale, v[2] * scale]
       return project(v, focalLen * scale, cx, cy)
     }
+    const applyAttitude = (p: V3): V3 => {
+      if (this.axis === 'roll') return rotX(p, gyroAngle)
+      if (this.axis === 'pitch') return rotZ(p, -gyroAngle)
+      return rotY(p, gyroAngle)
+    }
+    const xform = (p: V3): [number, number, number] => camProject(applyAttitude(p))
+    const xformWorld = (p: V3): [number, number, number] => camProject(p)
 
     // Motor positions (X-frame, in XZ plane, Y=0)
     const motorPos: V3[] = [
@@ -240,11 +243,11 @@ export class FpvQuadPreview3d extends LitElement {
     const gridSpan = 2.0
     for (let i = -gridN; i <= gridN; i++) {
       const t = (i / gridN) * gridSpan
-      const a = xform([t, -0.5, -gridSpan])
-      const b = xform([t, -0.5, gridSpan])
+      const a = xformWorld([t, -0.5, -gridSpan])
+      const b = xformWorld([t, -0.5, gridSpan])
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke()
-      const c = xform([-gridSpan, -0.5, t])
-      const d = xform([gridSpan, -0.5, t])
+      const c = xformWorld([-gridSpan, -0.5, t])
+      const d = xformWorld([gridSpan, -0.5, t])
       ctx.beginPath(); ctx.moveTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.stroke()
     }
     ctx.globalAlpha = 1
@@ -252,7 +255,7 @@ export class FpvQuadPreview3d extends LitElement {
     // ── Draw shadow on grid ──
     ctx.globalAlpha = 0.08
     ctx.fillStyle = clrPrimary
-    const shadowCenter = xform([0, -0.5, 0])
+    const shadowCenter = xformWorld([0, -0.5, 0])
     ctx.beginPath()
     ctx.ellipse(shadowCenter[0], shadowCenter[1], scale * 0.3, scale * 0.12, 0, 0, TAU)
     ctx.fill()
@@ -331,7 +334,9 @@ export class FpvQuadPreview3d extends LitElement {
 
           // Thrust column (vertical bar above motor)
           if (thrust > 0.01) {
-            const thrustTop: V3 = [motorPos[i][0], motorPos[i][1] + thrust * 0.8, motorPos[i][2]]
+            // Signed column: up for +thrust, down for −, so a roll/pitch couple
+            // (opposite-sign motors) reads as the differential that drives it.
+            const thrustTop: V3 = [motorPos[i][0], motorPos[i][1] + mOut * 0.8, motorPos[i][2]]
             const tp = xform(thrustTop)
             ctx.beginPath()
             ctx.moveTo(mp[0], mp[1])
